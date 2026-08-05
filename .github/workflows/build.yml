@@ -9,6 +9,8 @@ jobs:
   android:
     name: Android (APK + AAB)
     runs-on: ubuntu-latest
+    env:
+      HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,16 +70,26 @@ jobs:
           path: android/app/build/outputs/bundle/release/*.aab
 
       - name: Upload generated keystore (KEEP SAFE)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+        if: env.HAS_ANDROID_KEYSTORE == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: android-keystore-KEEP-SAFE
           path: android/release.jks
 
+  ios-gate:
+    name: iOS signing check
+    runs-on: ubuntu-latest
+    outputs:
+      has_ios_cert: ${{ steps.check.outputs.has_ios_cert }}
+    steps:
+      - id: check
+        run: echo "has_ios_cert=${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+
   ios:
     name: iOS (IPA for App Store)
     runs-on: macos-14
-    if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+    needs: ios-gate
+    if: needs.ios-gate.outputs.has_ios_cert == 'true'
     steps:
       - uses: actions/checkout@v4
 
