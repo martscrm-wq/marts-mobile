@@ -1,0 +1,10 @@
+{
+  "appId": "com.marts.crm",
+  "appName": "Marts CRM",
+  "webDir": "app",
+  "backgroundColor": "#f4f1e8",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true
+  }
+}

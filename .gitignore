@@ -1,0 +1,33 @@
+node_modules/
+app/node_modules/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
+android/captures/
+.externalNativeBuild/
+.cxx/
+
+# iOS
+ios/App/Pods/
+ios/App/App/public/
+ios/**/DerivedData/
+ios/**/*.xcworkspace/xcuserdata/
+ios/**/xcuserdata/
+*.ipa
+ios/App/App.xcworkspace/xcshareddata/xcschemes/*.xcscheme
+
+# Secrets / env
+*.env
+.env*
+secrets/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
