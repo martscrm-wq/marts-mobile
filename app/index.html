@@ -7107,6 +7107,77 @@ function createAutoJournalEntry(type, data) {
   }
 }
 
+const EMP_ROLE_TO_USER_ROLE = {
+  ceo:'owner',
+  sales_director:'head_of_sales',
+  sales_manager:'sm',
+  team_leader:'tl',
+  senior_property_consultant:'sales',
+  property_consultant:'sales',
+  property_advisor:'sales',
+  sales_admin:'sales',
+  hr_manager:'hr_manager',
+  hr_agent:'operations',
+  operation_director:'operations',
+  operation:'operations',
+  marketing_director:'md',
+  marketing_assistant:'ma',
+  accountant:'accounting',
+  collector:'accounting',
+  office_boy:'sales',
+  quality_control:'sales'
+};
+function empToUserRole(role){ return EMP_ROLE_TO_USER_ROLE[role] || 'sales'; }
+
+const AR_TO_LATIN = {
+  'ا':'a','أ':'a','إ':'e','آ':'a','ء':'a','ب':'b','ت':'t','ث':'th','ج':'g','ح':'h','خ':'kh','د':'d','ذ':'th',
+  'ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k',
+  'ل':'l','م':'m','ن':'n','ه':'h','و':'w','ي':'y','ى':'a','ة':'a','ؤ':'o','ئ':'e'
+};
+function arabicToLatin(s){
+  return String(s||'').split('').map(ch=>AR_TO_LATIN[ch]||ch).join('');
+}
+function empDefaultPerms(role){
+  if(role==='owner') return DEFAULT_PERMS_OWNER;
+  if(role==='super_admin') return DEFAULT_PERMS_SUPER_ADMIN;
+  if(role==='head_of_sales') return DEFAULT_PERMS_HEAD_OF_SALES;
+  if(role==='sm') return DEFAULT_PERMS_SALES_MANAGER;
+  if(role==='tl') return DEFAULT_PERMS_TEAM_LEADER;
+  if(role==='sales') return DEFAULT_PERMS_SALES;
+  if(role==='md') return DEFAULT_PERMS_MARKETING_DIRECTOR;
+  if(role==='ma') return DEFAULT_PERMS_MARKETING_ASSISTANT;
+  if(role==='marketer') return DEFAULT_PERMS_MARKETER;
+  if(role==='operations') return DEFAULT_PERMS_OPERATIONS;
+  if(role==='accounting') return DEFAULT_PERMS_ACCOUNTING;
+  if(role==='hr_manager') return DEFAULT_PERMS_HR_MANAGER;
+  return [];
+}
+function empAutoCreateUser(emp){
+  if(!emp || !emp.name) return null;
+  const users = STORAGE.get('users', defaultUsers);
+  if(users.some(u=>u.empId===emp.id)) return null;
+  const role = empToUserRole(emp.role);
+  let base = arabicToLatin(emp.name).toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g,'.')
+    .replace(/^\.+|\.+$/g,'')
+    .replace(/\.{2,}/g,'.');
+  if(!base) base = 'emp' + emp.id;
+  let username = base, i = 2;
+  while(users.some(u=>u.username.toLowerCase()===username.toLowerCase())){ username = base + '.' + (i++); }
+  const password = 'Marts@123';
+  const user = {
+    username, password, role,
+    fullName: emp.name,
+    email: username + '@marts-eg.com',
+    permissions: empDefaultPerms(role),
+    accountType: 'system',
+    empId: emp.id
+  };
+  users.push(user);
+  STORAGE.set('users', users);
+  return user;
+}
+
 function saveEmp(empId) {
   const role = document.getElementById('e_role').value;
   const name = document.getElementById('e_name').value.trim();
@@ -7136,6 +7207,7 @@ function saveEmp(empId) {
   }
   STORAGE.set('employees',employees);
   if(!empId) {
+    const newUser = empAutoCreateUser(data);
     createAutoJournalEntry('new_employee', {
       desc: 'موظف جديد: ' + name,
       amount: data.salary,
@@ -7144,6 +7216,11 @@ function saveEmp(empId) {
       franchiseId: data.franchiseId,
       branchId: data.branchId
     });
+    if(newUser){
+      alert((lang==='ar'
+        ? 'تم إنشاء حساب CRM تلقائياً للموظف:\nالمستخدم: ' + newUser.username + '\nكلمة المرور: ' + newUser.password
+        : 'CRM account created automatically:\nUsername: ' + newUser.username + '\nPassword: ' + newUser.password));
+    }
   }
   closeModal();
   if(document.getElementById('hrTabContent')) renderHrTabContent();
@@ -7338,13 +7415,14 @@ function importEmpExcel(event) {
       let employees = STORAGE.get('employees', []);
       let added = 0;
       let skipped = 0;
+      const addedRows = [];
       data.forEach(row => {
         const name = (row.name || row['الاسم'] || '').trim();
         if(!name) { skipped++; return; }
         const roleVal = String(row.role || row['الدور'] || 'property_consultant').trim();
         const allRoles = getAllRoles();
         const matchedRole = allRoles.find(r => r.id === roleVal || r.ar === roleVal || r.en.toLowerCase() === roleVal.toLowerCase());
-        employees.push({
+        const emp = {
           id: uid(),
           role: matchedRole ? matchedRole.id : 'property_consultant',
           name: name,
@@ -7359,11 +7437,15 @@ function importEmpExcel(event) {
           status: (row.status || row['الحالة'] || 'active').toLowerCase(),
           supervisor: row.supervisor || row['المشرف'] || '',
           files: []
-        });
+        };
+        employees.push(emp);
+        addedRows.push(emp);
         added++;
       });
       STORAGE.set('employees', employees);
-      alert((lang==='ar'?'تم استيراد ':'Imported ') + added + (lang==='ar'?' موظف بنجاح':' employees successfully') + (skipped > 0 ? ('\n' + (lang==='ar'?'تم تجاهل ':'Skipped ') + skipped + (lang==='ar'?' صف (بدون اسم)':' rows (no name)')) : ''));
+      let accounts = 0;
+      addedRows.forEach(emp => { if(empAutoCreateUser(emp)) accounts++; });
+      alert((lang==='ar'?'تم استيراد ':'Imported ') + added + (lang==='ar'?' موظف بنجاح':' employees successfully') + (skipped > 0 ? ('\n' + (lang==='ar'?'تم تجاهل ':'Skipped ') + skipped + (lang==='ar'?' صف (بدون اسم)':' rows (no name)')) : '') + (accounts > 0 ? ('\n' + (lang==='ar'?'تم إنشاء ':'Created ') + accounts + (lang==='ar'?' حساب CRM (كلمة المرور الافتراضية Marts@123)':' CRM accounts (default password Marts@123)')) : ''));
       renderHrTabContent();
     } catch(err) { alert('Import error: ' + err.message); }
   };
