@@ -55,7 +55,7 @@ jobs:
 
       - name: Build debug APK + release AAB
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug bundleRelease
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug bundleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
