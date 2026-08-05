@@ -90,6 +90,8 @@ jobs:
     runs-on: macos-14
     needs: ios-gate
     if: needs.ios-gate.outputs.has_ios_cert == 'true'
+    env:
+      HAS_ASC_API_KEY: ${{ secrets.ASC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -158,6 +160,18 @@ jobs:
         run: |
           xcodebuild -exportArchive -archivePath build/Marts.xcarchive \
             -exportOptionsPlist exportOptions.plist -exportPath build/export
+
+      - name: Upload IPA to App Store Connect (TestFlight)
+        if: env.HAS_ASC_API_KEY == 'true'
+        env:
+          ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          echo "$ASC_API_KEY" > /tmp/AuthKey_$ASC_API_KEY_ID.p8
+          xcrun altool --upload-app --file build/export/*.ipa \
+            --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID" \
+            --type ios --verbose
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
