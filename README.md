@@ -67,3 +67,42 @@ $env:JAVA_HOME="C:\Android\jdk17\jdk-17.0.20+8"; $env:ANDROID_HOME="C:\Android"
 - **Play Store (أندرويد)**: ارفع ملف AAB موقّع. من Android Studio: Build ▸ Generate Signed Bundle/APK ▸ Android App Bundle. أو من CLI: `.\gradlew.bat bundleRelease` بعد إعداد التوقيع في `android/app/build.gradle`.
 - **App Store (iOS)**: على ماك — `cd ios/App && pod install` ثم افتح `App.xcworkspace` في Xcode، واضبط التوقيع (فريقك) ثم Product ▸ Archive ثم Upload to App Store Connect. أو عبر CI سحابي.
 
+## النشر السحابي (GitHub Actions) — أندرويد + iOS تلقائياً
+يوجد سير عمل جاهز في `.github/workflows/build.yml` يبني في كل رفع على `main`:
+- **Android**: APK تصحيح + **AAB موقّع** جاهز لرفع Play Store.
+- **iOS**: IPA لرفع App Store (يعمل تلقائياً فقط عندما تضبط أسرار التوقيع).
+
+### 1) رفع المشروع إلى GitHub
+```powershell
+cd C:\marts-mobile
+git remote add origin https://github.com/<اسمك>/marts-crm.git
+git branch -M main
+git push -u origin main
+```
+> إذا لم يكن لديك مستودع: أنشئ واحداً على github.com ثم نفّذ الأوامر أعلاه.
+
+### 2) ضبط الأسرار (Settings ▸ Secrets and variables ▸ Actions)
+| السر | الغرض |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | (اختياري أول مرة) keystore بصيغة Base64. إن تُرك فارغاً، يولد السير عمل مفتاحاً جديداً ويرفعه كـ artifact اسمه `android-keystore-KEEP-SAFE` — **احفظه** ثم حوّله Base64 وضعه هنا لتحديثاتك القادمة بنفس المفتاح. |
+| `ANDROID_KEYSTORE_PASSWORD` | كلمة مرور المخزن |
+| `ANDROID_KEY_ALIAS` | الاسم المستعار للمفتاح (الافتراضي `marts`) |
+| `ANDROID_KEY_PASSWORD` | كلمة مرور المفتاح |
+| `IOS_CERTIFICATE_BASE64` | شهادة توزيع Apple (`.p12`) Base64 — من Apple Developer |
+| `IOS_CERTIFICATE_PASSWORD` | كلمة مرور الشهادة |
+| `IOS_PROVISIONING_PROFILE_BASE64` | ملف `.mobileprovision` Base64 |
+| `IOS_PROFILE_NAME` | اسم ملف التزويد (الظاهر في exportOptions) |
+| `IOS_TEAM_ID` | معرف فريق Apple Developer |
+
+### 3) أين النتائج؟
+مستودعك ▸ تبويب **Actions** ▸ آخر run ▸ أسفل الصفحة قسم **Artifacts**:
+- `android-aab-release` → ارفعه في **Play Console** (Play Store).
+- `android-apk-debug` → للتثبيت المباشر على الهاتف.
+- `ios-ipa` → ارفعه بـ Transporter على **App Store Connect** (iOS).
+
+### ملاحظات
+- الرفع على App Store يتطلب اشتراك **Apple Developer (99$/سنة)** — لا مفر منه.
+- دقائق ماكينات macOS في GitHub مجانية للمستودعات **العامة** فقط؛ للمستودع الخاص تحتاج خطة مدفوعة. بديل مجاني ممتاز لـ iOS: **Codemagic** (500 دقيقة شهرياً، دعم أصلي لـ Capacitor).
+- iOS: لا يظهر الـ IPA إلا إذا ضبطت أسرار التوقيع الخمسة أعلاه؛ بدونها يتخطى السير عمل وظيفة iOS بسلام.
+
+
